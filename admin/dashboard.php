@@ -18,6 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->bind_param("sssii", $title, $description, $deadline, $assigned_to, $created_by);
     if ($stmt->execute()) {
         $success = "Task assigned successfully!";
+        // Add notification for the assigned team member
+        $message = "New task '$title' assigned to you by Admin.";
+        $stmt_notify = $conn->prepare("INSERT INTO notifications (user_id, message) VALUES (?, ?)");
+        $stmt_notify->bind_param("is", $assigned_to, $message);
+        $stmt_notify->execute();
     } else {
         $error = "Error assigning task.";
     }
@@ -120,29 +125,31 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Assigned Tasks</h5>
-                    <?php
-                    $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, u.username 
-                                           FROM tasks t 
-                                           JOIN users u ON t.assigned_to = u.id 
-                                           WHERE t.created_by = " . $_SESSION['user_id']);
-                    if ($tasks->num_rows > 0) {
-                        echo "<table class='table table-striped'>";
-                        echo "<thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned To</th><th>Status</th></tr></thead>";
-                        echo "<tbody>";
-                        while ($task = $tasks->fetch_assoc()) {
-                            echo "<tr>";
-                            echo "<td>" . $task['id'] . "</td>";
-                            echo "<td>" . $task['title'] . "</td>";
-                            echo "<td>" . $task['deadline'] . "</td>";
-                            echo "<td>" . $task['username'] . "</td>";
-                            echo "<td>" . $task['status'] . "</td>";
-                            echo "</tr>";
+                    <div id="taskList">
+                        <?php
+                        $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, u.username 
+                                               FROM tasks t 
+                                               JOIN users u ON t.assigned_to = u.id 
+                                               WHERE t.created_by = " . $_SESSION['user_id']);
+                        if ($tasks->num_rows > 0) {
+                            echo "<table class='table table-striped'>";
+                            echo "<thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned To</th><th>Status</th></tr></thead>";
+                            echo "<tbody>";
+                            while ($task = $tasks->fetch_assoc()) {
+                                echo "<tr>";
+                                echo "<td>" . $task['id'] . "</td>";
+                                echo "<td>" . $task['title'] . "</td>";
+                                echo "<td>" . $task['deadline'] . "</td>";
+                                echo "<td>" . $task['username'] . "</td>";
+                                echo "<td>" . $task['status'] . "</td>";
+                                echo "</tr>";
+                            }
+                            echo "</tbody></table>";
+                        } else {
+                            echo "<p>No tasks assigned yet.</p>";
                         }
-                        echo "</tbody></table>";
-                    } else {
-                        echo "<p>No tasks assigned yet.</p>";
-                    }
-                    ?>
+                        ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -150,5 +157,30 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function updateTaskList() {
+            fetch('get_tasks.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.log(data.error);
+                        return;
+                    }
+                    let html = '<table class="table table-striped"><thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned To</th><th>Status</th></tr></thead><tbody>';
+                    data.forEach(task => {
+                        html += `<tr><td>${task.id}</td><td>${task.title}</td><td>${task.deadline}</td><td>${task.username}</td><td>${task.status}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                    if (data.length === 0) html = '<p>No tasks assigned yet.</p>';
+                    document.getElementById('taskList').innerHTML = html;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Update every 5 seconds
+        setInterval(updateTaskList, 5000);
+        // Initial update
+        updateTaskList();
+    </script>
 </body>
 </html>
