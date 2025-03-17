@@ -19,6 +19,7 @@
         <?php
         session_start();
         require_once 'includes/db.php';
+
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $username = $_POST['username'];
             $password = $_POST['password'];
@@ -27,11 +28,16 @@
             $stmt->execute();
             $result = $stmt->get_result();
             $user = $result->fetch_assoc();
+
             if ($user && password_verify($password, $user['password'])) {
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['role'] = $user['role'];
-                echo "Login successful! Redirecting...";
-                // Redirect based on role (to be added later)
+                if ($user['role'] == 'admin') {
+                    header("Location: admin/dashboard.php");
+                } else {
+                    header("Location: team/task_list.php");
+                }
+                exit();
             } else {
                 echo "Invalid username or password.";
             }
