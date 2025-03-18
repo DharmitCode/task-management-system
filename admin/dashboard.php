@@ -108,7 +108,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['new_username'])) {
     $password = $_POST['new_password'];
     $role = $_POST['new_role'];
 
-    // Validate password strength (optional, can be customized)
     if (strlen($password) < 6) {
         $error = "Password must be at least 6 characters long.";
     } else {
@@ -142,9 +141,95 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.css" />
     <link rel="stylesheet" href="../assets/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 10px 20px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .header .menu-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #007aff;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+        .header .menu-btn:hover {
+            color: #005bb5;
+            transform: scale(1.1);
+        }
+        .header .menu-btn:active {
+            transform: scale(0.98);
+        }
+        .content {
+            padding-top: 60px; /* Adjust for header height */
+            transition: margin-left 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .nav-panel {
+            position: fixed;
+            top: 0;
+            left: -250px;
+            width: 250px;
+            height: 100%;
+            background-color: #ffffff;
+            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            z-index: 1001;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .nav-panel.active {
+            transform: translateX(250px);
+        }
+        .nav-panel .nav-item {
+            margin-bottom: 15px;
+        }
+        .nav-panel .nav-link {
+            display: block;
+            padding: 12px 15px;
+            color: #007aff;
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 12px;
+            transition: background-color 0.3s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .nav-panel .nav-link:hover, .nav-panel .nav-link.active {
+            background-color: #f2f2f7;
+            transform: scale(1.02);
+        }
+    </style>
 </head>
 <body>
-    <button id="sidebar-toggle" class="animate__animated">Menu</button>
+    <header class="header">
+        <button class="menu-btn" id="menu-toggle">&#9776;</button>
+        <h4 class="m-0">Dashboard</h4>
+        <div></div> <!-- Spacer for alignment -->
+    </header>
+    <div class="nav-panel" id="nav-panel">
+        <div class="nav-panel-header">
+            <h3>Menu</h3>
+        </div>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active" href="dashboard.php">Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="../logout.php">Logout</a>
+            </li>
+        </ul>
+    </div>
     <div class="content">
         <h2 class="card-title animate__animated animate__fadeIn">Dashboard</h2>
 
@@ -176,7 +261,9 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
                         <div class="card">
                             <div class="card-body">
                                 <h5 class="card-title">Task Completion Rate</h5>
-                                <p>This feature will be added later (e.g., a chart).</p>
+                                <div style="position: relative; height: 200px;">
+                                    <canvas id="completionChart"></canvas>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -351,23 +438,20 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
             </div>
         </div>
     </div>
-    <?php include '../includes/sidebar.php'; ?>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('sidebar-toggle').addEventListener('click', function() {
-            const sidebar = document.querySelector('.sidebar');
-            const content = document.querySelector('.content');
-            sidebar.classList.toggle('active');
-            content.classList.toggle('shifted');
-            if (sidebar.classList.contains('active')) {
-                sidebar.classList.add('animate__slideInLeft');
-                sidebar.classList.remove('animate__slideOutLeft');
+        document.getElementById('menu-toggle').addEventListener('click', function() {
+            const navPanel = document.getElementById('nav-panel');
+            navPanel.classList.toggle('active');
+            if (navPanel.classList.contains('active')) {
+                navPanel.classList.add('animate__slideInLeft');
+                navPanel.classList.remove('animate__slideOutLeft');
             } else {
-                sidebar.classList.add('animate__slideOutLeft');
-                sidebar.classList.remove('animate__slideInLeft');
+                navPanel.classList.add('animate__slideOutLeft');
+                navPanel.classList.remove('animate__slideInLeft');
             }
             setTimeout(() => {
-                sidebar.classList.remove('animate__slideInLeft', 'animate__slideOutLeft');
+                navPanel.classList.remove('animate__slideInLeft', 'animate__slideOutLeft');
             }, 500);
         });
 
@@ -380,11 +464,10 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
             if (touchStartX < 50) {
                 const touchCurrentX = e.touches[0].clientX;
                 const diff = touchCurrentX - touchStartX;
-                if (diff > 100 && !document.querySelector('.sidebar').classList.contains('active')) {
-                    document.querySelector('.sidebar').classList.add('active');
-                    document.querySelector('.content').classList.add('shifted');
-                    document.querySelector('.sidebar').classList.add('animate__slideInLeft');
-                    setTimeout(() => document.querySelector('.sidebar').classList.remove('animate__slideInLeft'), 500);
+                if (diff > 100 && !document.getElementById('nav-panel').classList.contains('active')) {
+                    document.getElementById('nav-panel').classList.add('active');
+                    document.getElementById('nav-panel').classList.add('animate__slideInLeft');
+                    setTimeout(() => document.getElementById('nav-panel').classList.remove('animate__slideInLeft'), 500);
                     touchStartX = 0;
                 }
             }
@@ -405,20 +488,20 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
             });
         });
 
-        function updateTaskList() {
+        function updateDashboard() {
             fetch('get_tasks.php')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                    return response.text();
+                    return response.json();
                 })
-                .then(text => {
-                    const data = JSON.parse(text);
+                .then(data => {
                     if (data.error) {
                         console.log('Error from server:', data.error);
                         return;
                     }
+                    // Update task list
                     let html = '<table class="table table-striped"><thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned To</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
                     data.forEach(task => {
                         html += `<tr><td>${task.id}</td><td>${task.title}</td><td>${task.deadline}</td><td>${task.username}</td><td>${task.status}</td><td><button class='btn btn-warning btn-sm me-2 edit-btn' data-bs-toggle='modal' data-bs-target='#editModal' data-id='${task.id}' data-title='${task.title}' data-deadline='${task.deadline}' data-assigned-to='${task.username}'>Edit</button><form method='POST' style='display:inline;' onsubmit='return confirm(\"Are you sure you want to delete this task?\");'><input type='hidden' name='delete_task_id' value='${task.id}'><button type='submit' class='btn btn-danger btn-sm'>Delete</button></form></td></tr>`;
@@ -426,6 +509,13 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
                     html += '</tbody></table>';
                     if (data.length === 0) html = '<p>No tasks assigned yet.</p>';
                     document.getElementById('taskList').innerHTML = html;
+
+                    // Update chart data
+                    const pending = data.filter(t => t.status === 'pending').length;
+                    const inProgress = data.filter(t => t.status === 'in_progress').length;
+                    const completed = data.filter(t => t.status === 'completed').length;
+                    completionChart.data.datasets[0].data = [pending, inProgress, completed];
+                    completionChart.update();
 
                     document.querySelectorAll('.edit-btn').forEach(button => {
                         button.addEventListener('click', function() {
@@ -444,8 +534,57 @@ $completed_tasks = $conn->query("SELECT COUNT(*) as count FROM tasks WHERE creat
                 });
         }
 
-        setInterval(updateTaskList, 5000);
-        updateTaskList();
+        // Chart.js Configuration
+        const ctx = document.getElementById('completionChart').getContext('2d');
+        const completionChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Pending', 'In Progress', 'Completed'],
+                datasets: [{
+                    data: [<?php echo $pending_tasks; ?>, <?php echo $in_progress_tasks; ?>, <?php echo $completed_tasks; ?>],
+                    backgroundColor: [
+                        'rgba(255, 59, 48, 0.8)',   // Red for Pending
+                        'rgba(255, 204, 0, 0.8)',   // Yellow for In Progress
+                        'rgba(52, 199, 89, 0.8)'    // Green for Completed
+                    ],
+                    borderColor: [
+                        'rgba(255, 59, 48, 1)',
+                        'rgba(255, 204, 0, 1)',
+                        'rgba(52, 199, 89, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    animateScale: true,
+                    animateRotate: true
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#1c1c1e',
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#ffffff',
+                        titleColor: '#1c1c1e',
+                        bodyColor: '#1c1c1e',
+                        borderColor: '#e5e5ea',
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+
+        setInterval(updateDashboard, 5000);
+        updateDashboard();
     </script>
 </body>
 </html>
