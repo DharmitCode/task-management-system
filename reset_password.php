@@ -2,43 +2,33 @@
 session_start();
 require_once 'includes/db.php';
 
-$success = isset($_GET['success']) ? urldecode($_GET['success']) : '';
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['force_password_reset']) || $_SESSION['force_password_reset'] !== true) {
+    header("Location: login.php");
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = $_POST['username'];
-    $password = $_POST['password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
 
-    $stmt = $conn->prepare("SELECT id, username, password, role, force_password_reset FROM users WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows == 1) {
-        $user = $result->fetch_assoc();
-        if (password_verify($password, $user['password'])) {
-            error_log("Debug: Login successful for $username, force_password_reset = " . $user['force_password_reset']);
-            if ($user['force_password_reset'] == 1) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['force_password_reset'] = true;
-                header("Location: reset_password.php");
-                exit();
-            } else {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                if ($user['role'] == 'admin') {
-                    header("Location: admin/dashboard.php");
-                } else {
-                    header("Location: team/task_list.php");
-                }
-                exit();
-            }
-        } else {
-            $error = "Invalid username or password.";
-        }
+    if (strlen($new_password) < 6) {
+        $error = "Password must be at least 6 characters long.";
+    } elseif ($new_password !== $confirm_password) {
+        $error = "Passwords do not match.";
     } else {
-        $error = "Invalid username or password.";
+        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        $user_id = $_SESSION['user_id'];
+
+        $stmt = $conn->prepare("UPDATE users SET password = ?, force_password_reset = 0 WHERE id = ?");
+        $stmt->bind_param("si", $hashed_password, $user_id);
+        if ($stmt->execute()) {
+            unset($_SESSION['force_password_reset']);
+            $success = "Password updated successfully! Please log in with your new password.";
+            header("Location: login.php?success=" . urlencode($success));
+            exit();
+        } else {
+            $error = "Error updating password: " . $conn->error;
+        }
     }
 }
 ?>
@@ -48,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Task Management System</title>
+    <title>Reset Password - Task Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/admin_styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -59,20 +49,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body">
-                        <h3 class="card-title text-center">Login</h3>
-                        <?php if (isset($success) && !empty($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
+                        <h3 class="card-title text-center">Reset Password</h3>
+                        <p class="text-center text-muted">You are required to set a new password.</p>
                         <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
                         <form method="POST" action="">
                             <div class="mb-4 position-relative">
-                                <label class="form-label">Username:</label>
-                                <input type="text" name="username" class="form-control" required>
-                            </div>
-                            <div class="mb-4 position-relative">
-                                <label class="form-label">Password:</label>
-                                <input type="password" name="password" class="form-control" required id="loginPassword">
+                                <label class="form-label">New Password:</label>
+                                <input type="password" name="new_password" class="form-control" required id="newPassword">
                                 <i class="fas fa-eye password-toggle position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;"></i>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Login</button>
+                            <div class="mb-4 position-relative">
+                                <label class="form-label">Confirm Password:</label>
+                                <input type="password" name="confirm_password" class="form-control" required id="confirmPassword">
+                                <i class="fas fa-eye password-toggle position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;"></i>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Update Password</button>
                         </form>
                     </div>
                 </div>

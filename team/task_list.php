@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'team') {
     header("Location: ../login.php");
@@ -77,97 +77,17 @@ $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, t.remarks, t.
     <title>Team Task List - Task Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.css" />
-    <link rel="stylesheet" href="../assets/css/styles.css">
-    <style>
-        .header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 10px 20px;
-            z-index: 1000;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .header .menu-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #007aff;
-            transition: transform 0.3s ease, color 0.3s ease;
-        }
-        .header .menu-btn:hover {
-            color: #005bb5;
-            transform: scale(1.1);
-        }
-        .header .menu-btn:active {
-            transform: scale(0.98);
-        }
-        .content {
-            padding-top: 60px; /* Adjust for header height */
-            transition: margin-left 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .nav-panel {
-            position: fixed;
-            top: 0;
-            left: -250px;
-            width: 250px;
-            height: 100%;
-            background-color: #ffffff;
-            box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            z-index: 1001;
-            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-        .nav-panel.active {
-            transform: translateX(250px);
-        }
-        .nav-panel .nav-item {
-            margin-bottom: 15px;
-        }
-        .nav-panel .nav-link {
-            display: block;
-            padding: 12px 15px;
-            color: #007aff;
-            text-decoration: none;
-            font-weight: 500;
-            border-radius: 12px;
-            transition: background-color 0.3s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .nav-panel .nav-link:hover, .nav-panel .nav-link.active {
-            background-color: #f2f2f7;
-            transform: scale(1.02);
-        }
-    </style>
+    <link rel="stylesheet" href="../assets/css/admin_styles.css">
 </head>
 <body>
-    <header class="header">
-        <button class="menu-btn" id="menu-toggle">&#9776;</button>
-        <h4 class="m-0">Task List</h4>
-        <div></div> <!-- Spacer for alignment -->
-    </header>
-    <div class="nav-panel" id="nav-panel">
-        <div class="nav-panel-header">
-            <h3>Menu</h3>
-        </div>
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link active" href="task_list.php">Task List</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="../logout.php">Logout</a>
-            </li>
-        </ul>
-    </div>
+    <?php include '../includes/menu.php'; ?>
+    <script>
+        document.getElementById('header-title').textContent = 'Team Task List';
+        document.getElementById('nav-link-1').setAttribute('href', 'task_list.php');
+        document.getElementById('nav-link-1').textContent = 'Task List';
+    </script>
     <div class="content">
-        <h2 class="card-title animate__animated animate__fadeIn">Task List</h2>
+        <h2 class="card-title animate__animated animate__fadeInDown">My Tasks</h2>
 
         <!-- Notifications -->
         <?php
@@ -183,9 +103,9 @@ $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, t.remarks, t.
         ?>
 
         <!-- Task List -->
-        <div class="card animate__animated animate__fadeInUp">
+        <div class="card animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
             <div class="card-body">
-                <h3 class="card-title">Your Tasks</h3>
+                <h3 class="card-title">Task Overview</h3>
                 <?php if (isset($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
                 <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
                 <div id="taskList">
@@ -237,43 +157,6 @@ $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, t.remarks, t.
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.getElementById('menu-toggle').addEventListener('click', function() {
-            const navPanel = document.getElementById('nav-panel');
-            navPanel.classList.toggle('active');
-            if (navPanel.classList.contains('active')) {
-                navPanel.classList.add('animate__slideInLeft');
-                navPanel.classList.remove('animate__slideOutLeft');
-            } else {
-                navPanel.classList.add('animate__slideOutLeft');
-                navPanel.classList.remove('animate__slideInLeft');
-            }
-            setTimeout(() => {
-                navPanel.classList.remove('animate__slideInLeft', 'animate__slideOutLeft');
-            }, 500);
-        });
-
-        let touchStartX = 0;
-        document.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            if (touchStartX < 50) {
-                const touchCurrentX = e.touches[0].clientX;
-                const diff = touchCurrentX - touchStartX;
-                if (diff > 100 && !document.getElementById('nav-panel').classList.contains('active')) {
-                    document.getElementById('nav-panel').classList.add('active');
-                    document.getElementById('nav-panel').classList.add('animate__slideInLeft');
-                    setTimeout(() => document.getElementById('nav-panel').classList.remove('animate__slideInLeft'), 500);
-                    touchStartX = 0;
-                }
-            }
-        });
-
-        document.addEventListener('touchend', () => {
-            touchStartX = 0;
-        });
-
         function updateTaskList() {
             fetch('../admin/get_tasks.php')
                 .then(response => {

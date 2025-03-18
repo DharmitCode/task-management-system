@@ -1,9 +1,12 @@
 <?php
+// includes/db.php
 $host = 'localhost';
-$db = 'task_management';
-$user = 'root';
-$pass = ''; // Empty for default XAMPP setup
-$conn = new mysqli($host, $user, $pass, $db);
+$username = 'root';
+$password = '';
+$database = 'task_management';
+
+$conn = new mysqli($host, $username, $password, $database);
+
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
