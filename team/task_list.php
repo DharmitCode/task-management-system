@@ -6,67 +6,32 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 'team') {
 }
 require_once '../includes/db.php';
 
-// Set default timezone to match the server's timezone (UTC-6:00)
-date_default_timezone_set('America/Chicago');
-
-// Fetch notifications
-$notifications = $conn->query("SELECT * FROM notifications WHERE user_id = " . $_SESSION['user_id'] . " AND is_read = 0");
-
-// Handle task status update and file upload
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['task_id']) && isset($_POST['status'])) {
+// Handle status update (if the form submits a new status)
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $task_id = $_POST['task_id'];
     $status = $_POST['status'];
-    $user_id = $_SESSION['user_id'];
-    $remarks = $_POST['remarks'] ?? '';
-    $media_path = null;
 
-    $task = $conn->query("SELECT deadline FROM tasks WHERE id = $task_id AND assigned_to = $user_id")->fetch_assoc();
-    if (!$task) {
-        $error = "Task not found.";
+    $stmt = $conn->prepare("UPDATE tasks SET status = ? WHERE id = ? AND assigned_to = ?");
+    $stmt->bind_param("sii", $status, $task_id, $_SESSION['user_id']);
+    if ($stmt->execute()) {
+        $success = "Task status updated successfully!";
     } else {
-        $deadline = new DateTime($task['deadline'], new DateTimeZone('UTC'));
-        $deadline->setTimezone(new DateTimeZone('America/Chicago'));
-        $now = new DateTime('now', new DateTimeZone('America/Chicago'));
-        error_log("Task $task_id - Deadline (Local, America/Chicago): " . $deadline->format('Y-m-d H:i:s') . ", Now (Local, America/Chicago): " . $now->format('Y-m-d H:i:s'));
-
-        if ($deadline < $now) {
-            $error = "Cannot edit task after the deadline has passed.";
-            error_log("Task $task_id edit blocked: Deadline passed.");
-        } else {
-            if (isset($_FILES['media']) && $_FILES['media']['error'] == UPLOAD_ERR_OK) {
-                $upload_dir = '../uploads/';
-                if (!file_exists($upload_dir)) mkdir($upload_dir, 0777, true);
-                $file_name = uniqid() . '_' . basename($_FILES['media']['name']);
-                $target_file = $upload_dir . $file_name;
-                $file_type = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-                $allowed_types = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
-
-                if (in_array($file_type, $allowed_types)) {
-                    if (move_uploaded_file($_FILES['media']['tmp_name'], $target_file)) {
-                        $media_path = 'uploads/' . $file_name;
-                    } else {
-                        $error = "Error uploading file.";
-                    }
-                } else {
-                    $error = "Only JPG, JPEG, PNG, PDF, DOC, and DOCX files are allowed.";
-                }
-            }
-
-            $stmt = $conn->prepare("UPDATE tasks SET status = ?, remarks = ?, media_path = ? WHERE id = ? AND assigned_to = ?");
-            $stmt->bind_param("sssii", $status, $remarks, $media_path, $task_id, $user_id);
-            if ($stmt->execute()) {
-                $success = "Task status updated successfully!";
-            } else {
-                $error = "Error updating task status: " . $stmt->error;
-            }
-        }
+        $error = "Error updating task status: " . $stmt->error;
     }
 }
 
-$tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, t.remarks, t.media_path, u.username as assigned_by 
-                       FROM tasks t 
-                       JOIN users u ON t.created_by = u.id 
-                       WHERE t.assigned_to = " . $_SESSION['user_id']);
+// Fetch tasks assigned to the current team member
+$current_date = date('Y-m-d H:i:s');
+$tasks_query = "SELECT t.id, t.title, t.description, t.deadline, t.status, u.username AS created_by 
+                FROM tasks t 
+                JOIN users u ON t.created_by = u.id 
+                WHERE t.assigned_to = " . $_SESSION['user_id'];
+$tasks = $conn->query($tasks_query);
+error_log("Debug: Tasks query executed, rows returned: " . $tasks->num_rows . ", assigned_to: " . $_SESSION['user_id']);
+
+// Fetch notifications (simplified, adjust based on your notifications table)
+$notifications_query = "SELECT message FROM notifications WHERE user_id = " . $_SESSION['user_id'] . " ORDER BY id DESC LIMIT 5";
+$notifications = $conn->query($notifications_query);
 ?>
 
 <!DOCTYPE html>
@@ -77,121 +42,146 @@ $tasks = $conn->query("SELECT t.id, t.title, t.deadline, t.status, t.remarks, t.
     <title>Team Task List - Task Management System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.css" />
+    <link rel="stylesheet" href="../assets/css/styles.css"> 
     <link rel="stylesheet" href="../assets/css/admin_styles.css">
+    <link rel="stylesheet" href="../assets/css/team_tasks.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <?php include '../includes/menu.php'; ?>
     <script>
         document.getElementById('header-title').textContent = 'Team Task List';
         document.getElementById('nav-link-1').setAttribute('href', 'task_list.php');
-        document.getElementById('nav-link-1').textContent = 'Task List';
+        document.getElementById('nav-link-1').textContent = 'My Tasks';
+
+        // Temporary message fade-out
+        document.addEventListener('DOMContentLoaded', () => {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.classList.add('fade-out');
+                    setTimeout(() => alert.remove(), 500);
+                }, 5000);
+            });
+
+            // Function to update notifications and tasks
+            function updateNotificationsAndTasks() {
+                // Fetch notifications
+                fetch('fetch_notifications.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'user_id=<?php echo $_SESSION['user_id']; ?>'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('notifications-section').innerHTML = data.notifications;
+                })
+                .catch(error => console.error('Error updating notifications:', error));
+
+                // Fetch tasks
+                fetch('fetch_tasks.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'user_id=<?php echo $_SESSION['user_id']; ?>'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('tasks-section').innerHTML = data.tasks;
+                })
+                .catch(error => console.error('Error updating tasks:', error));
+            }
+
+            // Initial update
+            updateNotificationsAndTasks();
+
+            // Update every 5 seconds
+            setInterval(updateNotificationsAndTasks, 5000);
+        });
     </script>
     <div class="content">
         <h2 class="card-title animate__animated animate__fadeInDown">My Tasks</h2>
 
-        <!-- Notifications -->
-        <?php
-        if ($notifications->num_rows > 0) {
-            echo "<div class='alert alert-info animate__animated animate__fadeIn'>";
-            echo "<h5>Notifications</h5>";
-            while ($notification = $notifications->fetch_assoc()) {
-                echo "<p>" . htmlspecialchars($notification['message']) . " (<small>" . $notification['created_at'] . "</small>)</p>";
-                $conn->query("UPDATE notifications SET is_read = 1 WHERE id = " . $notification['id']);
-            }
-            echo "</div>";
-        }
-        ?>
-
-        <!-- Task List -->
-        <div class="card animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
+        <!-- Notifications Section -->
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
             <div class="card-body">
-                <h3 class="card-title">Task Overview</h3>
-                <?php if (isset($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
-                <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
-                <div id="taskList">
-                    <?php
-                    if ($tasks->num_rows > 0) {
-                        echo "<table class='table table-striped'>";
-                        echo "<thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned By</th><th>Status</th><th>Remarks</th><th>Media</th><th>Action</th></tr></thead>";
-                        echo "<tbody>";
-                        while ($task = $tasks->fetch_assoc()) {
-                            $deadline = new DateTime($task['deadline'], new DateTimeZone('UTC'));
-                            $deadline->setTimezone(new DateTimeZone('America/Chicago'));
-                            $now = new DateTime('now', new DateTimeZone('America/Chicago'));
-                            $isPastDeadline = $deadline < $now;
-                            error_log("PHP - Task {$task['id']} - Deadline (Local, America/Chicago): " . $deadline->format('Y-m-d H:i:s') . ", Now (Local, America/Chicago): " . $now->format('Y-m-d H:i:s') . ", Past Due: " . ($isPastDeadline ? 'Yes' : 'No'));
-                            echo "<tr>";
-                            echo "<td>" . $task['id'] . "</td>";
-                            echo "<td>" . $task['title'] . "</td>";
-                            echo "<td>" . $deadline->format('Y-m-d H:i:s') . " " . ($isPastDeadline ? "<span class='badge bg-danger'>Past Due</span>" : "") . "</td>";
-                            echo "<td>" . $task['assigned_by'] . "</td>";
-                            echo "<td>" . $task['status'] . "</td>";
-                            echo "<td>" . ($task['remarks'] ? htmlspecialchars($task['remarks']) : '-') . "</td>";
-                            echo "<td>" . ($task['media_path'] ? "<a href='" . $task['media_path'] . "' target='_blank'>View</a>" : '-') . "</td>";
-                            echo "<td>";
-                            if (!$isPastDeadline) {
-                                echo "<form method='POST' enctype='multipart/form-data' style='display:inline;'>";
-                                echo "<input type='hidden' name='task_id' value='" . $task['id'] . "'>";
-                                echo "<select name='status' class='form-select' onchange='this.form.submit()'>";
-                                echo "<option value='pending' " . ($task['status'] == 'pending' ? 'selected' : '') . ">Pending</option>";
-                                echo "<option value='in_progress' " . ($task['status'] == 'in_progress' ? 'selected' : '') . ">In Progress</option>";
-                                echo "<option value='completed' " . ($task['status'] == 'completed' ? 'selected' : '') . ">Completed</option>";
-                                echo "</select>";
-                                echo "<textarea name='remarks' class='form-control mt-2' placeholder='Add remarks'>" . ($task['remarks'] ? $task['remarks'] : '') . "</textarea>";
-                                echo "<input type='file' name='media' class='form-control mt-2' accept='.jpg,.jpeg,.png,.pdf,.doc,.docx'>";
-                                echo "</form>";
-                            } else {
-                                echo "<span class='badge bg-secondary'>No edits allowed</span>";
-                            }
-                            echo "</td>";
-                            echo "</tr>";
-                        }
-                        echo "</tbody></table>";
-                    } else {
-                        echo "<p>No tasks assigned to you yet.</p>";
-                    }
-                    ?>
+                <h3 class="card-title">Notifications</h3>
+                <div id="notifications-section">
+                    <?php if ($notifications->num_rows > 0): ?>
+                        <ul class="list-group">
+                            <?php while ($notification = $notifications->fetch_assoc()): ?>
+                                <li class="list-group-item"><?php echo htmlspecialchars($notification['message']); ?></li>
+                            <?php endwhile; ?>
+                        </ul>
+                    <?php else: ?>
+                        <p class="text-muted">No notifications.</p>
+                    <?php endif; ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- Tasks Assigned to You -->
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.2s">
+            <div class="card-body">
+                <h3 class="card-title">Tasks Assigned to You</h3>
+                <div id="tasks-section">
+                    <?php if ($tasks->num_rows > 0): ?>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Title</th>
+                                    <th>Description</th>
+                                    <th>Deadline</th>
+                                    <th>Status & Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php while ($task = $tasks->fetch_assoc()): ?>
+                                    <?php
+                                    $is_overdue = (strtotime($task['deadline']) < strtotime($current_date));
+                                    $row_class = $is_overdue ? 'table-danger' : '';
+                                    $disabled = $is_overdue ? 'disabled' : '';
+                                    ?>
+                                    <tr class="<?php echo $row_class; ?>">
+                                        <td><?php echo $task['id']; ?></td>
+                                        <td><?php echo htmlspecialchars($task['title']); ?></td>
+                                        <td><?php echo htmlspecialchars($task['description']); ?></td>
+                                        <td><?php echo $task['deadline']; ?></td>
+                                        <td>
+                                            <form method="POST" style="display:inline;">
+                                                <input type="hidden" name="task_id" value="<?php echo $task['id']; ?>">
+                                                <select name="status" class="form-select ios-status-select animate__animated animate__fadeIn" style="animation-delay: 0.3s" onchange="this.form.submit()" <?php echo $disabled; ?>>
+                                                    <option value="pending" <?php echo $task['status'] == 'pending' ? 'selected' : ''; ?>>Pending</option>
+                                                    <option value="in_progress" <?php echo $task['status'] == 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
+                                                    <option value="completed" <?php echo $task['status'] == 'completed' ? 'selected' : ''; ?>>Completed</option>
+                                                </select>
+                                                <input type="hidden" name="update_status" value="1">
+                                            </form>
+                                            <?php if ($is_overdue): ?>
+                                                <span class="text-danger ms-2">Overdue</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <p class="text-muted">No tasks assigned to you.</p>
+                    <?php endif; ?>
+                </div>
+                <?php if (isset($success)): ?>
+                    <div class="alert alert-success animate__animated animate__fadeIn"><?php echo $success; ?></div>
+                <?php endif; ?>
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo $error; ?></div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function updateTaskList() {
-            fetch('../admin/get_tasks.php')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.error) {
-                        console.log('Error from server:', data.error);
-                        return;
-                    }
-                    let html = '<table class="table table-striped"><thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned By</th><th>Status</th><th>Remarks</th><th>Media</th><th>Action</th></tr></thead><tbody>';
-                    const userTimezoneOffset = -360;
-                    data.forEach(task => {
-                        const deadline = new Date(task.deadline + 'Z');
-                        const deadlineLocal = new Date(deadline.getTime() + userTimezoneOffset * 60 * 1000);
-                        const now = new Date();
-                        const nowLocal = new Date(now.getTime() + userTimezoneOffset * 60 * 1000);
-                        const isPastDeadline = deadlineLocal < nowLocal;
-                        html += `<tr><td>${task.id}</td><td>${task.title}</td><td>${deadlineLocal.toISOString().slice(0, 19).replace('T', ' ')} ${isPastDeadline ? '<span class="badge bg-danger">Past Due</span>' : ''}</td><td>${task.assigned_by}</td><td>${task.status}</td><td>${task.remarks ? task.remarks : '-'}</td><td>${task.media_path ? `<a href='${task.media_path}' target='_blank'>View</a>` : '-'}</td><td>${!isPastDeadline ? `<form method='POST' enctype='multipart/form-data' style='display:inline;'><input type='hidden' name='task_id' value='${task.id}'><select name='status' class='form-select' onchange='this.form.submit()'><option value='pending' ${task.status === 'pending' ? 'selected' : ''}>Pending</option><option value='in_progress' ${task.status === 'in_progress' ? 'selected' : ''}>In Progress</option><option value='completed' ${task.status === 'completed' ? 'selected' : ''}>Completed</option></select><textarea name='remarks' class='form-control mt-2' placeholder='Add remarks'>${task.remarks || ''}</textarea><input type='file' name='media' class='form-control mt-2' accept='.jpg,.jpeg,.png,.pdf,.doc,.docx'></form>` : '<span class="badge bg-secondary">No edits allowed</span>'}</td></tr>`;
-                    });
-                    html += '</tbody></table>';
-                    if (data.length === 0) html = '<p>No tasks assigned to you yet.</p>';
-                    document.getElementById('taskList').innerHTML = html;
-                })
-                .catch(error => {
-                    console.error('Fetch error:', error);
-                    document.getElementById('taskList').innerHTML = '<p>Error loading tasks. Check console for details.</p>';
-                });
-        }
-
-        setInterval(updateTaskList, 5000);
-        updateTaskList();
-    </script>
 </body>
 </html>

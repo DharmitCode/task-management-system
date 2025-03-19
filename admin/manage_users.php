@@ -64,6 +64,7 @@ $users = $conn->query("SELECT id, username, role FROM users");
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.css" />
     <link rel="stylesheet" href="../assets/css/admin_styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <?php include '../includes/menu.php'; ?>
@@ -71,11 +72,6 @@ $users = $conn->query("SELECT id, username, role FROM users");
         document.getElementById('header-title').textContent = 'Manage Users';
         document.getElementById('nav-link-1').setAttribute('href', 'dashboard.php');
         document.getElementById('nav-link-1').textContent = 'Dashboard';
-
-        // 5-second reload
-        setInterval(() => {
-            location.reload();
-        }, 5000);
 
         // Temporary message fade-out
         document.addEventListener('DOMContentLoaded', () => {
@@ -87,46 +83,58 @@ $users = $conn->query("SELECT id, username, role FROM users");
                 }, 5000); // Show for 5 seconds
             });
         });
+
+        // Password reveal toggle
+        document.querySelectorAll('.password-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const passwordField = this.previousElementSibling;
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                this.classList.toggle('fa-eye-slash');
+            });
+        });
     </script>
     <div class="content">
-        <h2 class="card-title animate__animated animate__slideInDown">User Management</h2>
+        <h2 class="card-title animate__animated animate__fadeInDown">User Management</h2>
 
         <!-- User Creation Form -->
-        <div class="card animate__animated animate__slideInUp" style="animation-delay: 0.1s">
+        <div class="card animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
             <div class="card-body">
                 <h3 class="card-title">Create New User</h3>
-                <?php if (isset($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
-                <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
+                <?php if (isset($success)): ?>
+                    <div class="alert alert-success animate__animated animate__fadeIn"><?php echo $success; ?></div>
+                <?php endif; ?>
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo $error; ?></div>
+                <?php endif; ?>
                 <form method="POST" action="">
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Username:</label>
-                        <input type="text" name="new_username" class="form-control rounded-pill" required>
+                        <input type="text" name="new_username" class="form-control" required>
                     </div>
-                    <div class="mb-3 position-relative">
+                    <div class="mb-4 position-relative">
                         <label class="form-label">Password:</label>
-                        <input type="password" name="new_password" class="form-control rounded-pill" id="new_password" required>
-                        <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y reveal-btn" data-target="#new_password" style="padding: 0 8px;">
-                            <i class="bi bi-eye"></i>
-                        </button>
+                        <input type="password" name="new_password" class="form-control" required id="newPassword">
+                        <i class="fas fa-eye password-toggle position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;"></i>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Role:</label>
-                        <select name="new_role" class="form-select rounded-pill" required>
+                        <select name="new_role" class="form-select" required>
                             <option value="team">Team Member</option>
                             <option value="admin">Admin</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary rounded-pill w-100 animate__animated animate__bounceIn" style="transition: transform 0.3s;">Create User</button>
+                    <button type="submit" class="btn btn-primary w-100">Create User</button>
                 </form>
             </div>
         </div>
 
         <!-- User List -->
-        <div class="card mt-4 animate__animated animate__slideInUp" style="animation-delay: 0.2s">
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.2s">
             <div class="card-body">
                 <h3 class="card-title">User List</h3>
                 <?php if ($users->num_rows > 0): ?>
-                    <table class="table table-striped rounded-pill overflow-hidden">
+                    <table class="table table-striped">
                         <thead>
                             <tr>
                                 <th>ID</th>
@@ -144,7 +152,7 @@ $users = $conn->query("SELECT id, username, role FROM users");
                                     <td>
                                         <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to reset the password for <?php echo $user['username']; ?>?');">
                                             <input type="hidden" name="reset_user_id" value="<?php echo $user['id']; ?>">
-                                            <button type="submit" class="btn btn-warning btn-sm rounded-pill animate__animated animate__bounceIn">Reset Password</button>
+                                            <button type="submit" class="btn btn-warning btn-sm">Reset Password</button>
                                         </form>
                                     </td>
                                 </tr>
@@ -158,25 +166,6 @@ $users = $conn->query("SELECT id, username, role FROM users");
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"></script>
-    <script>
-        // Reveal password toggle
-        document.querySelectorAll('.reveal-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const input = document.querySelector(button.getAttribute('data-target'));
-                const icon = button.querySelector('i');
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.classList.remove('bi-eye');
-                    icon.classList.add('bi-eye-slash');
-                } else {
-                    input.type = 'password';
-                    icon.classList.remove('bi-eye-slash');
-                    icon.classList.add('bi-eye');
-                }
-            });
-        });
-    </script>
     <style>
         .fade-out {
             animation: fadeOut 0.5s ease-in-out forwards;

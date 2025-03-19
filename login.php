@@ -60,8 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="card">
                     <div class="card-body">
                         <h3 class="card-title text-center">Login</h3>
-                        <?php if (isset($success) && !empty($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
-                        <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
+                        <?php if (isset($success) && !empty($success)): ?>
+                            <div class="alert alert-success animate__animated animate__fadeIn"><?php echo $success; ?></div>
+                        <?php endif; ?>
+                        <?php if (isset($error)): ?>
+                            <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo $error; ?></div>
+                        <?php endif; ?>
                         <form method="POST" action="">
                             <div class="mb-4 position-relative">
                                 <label class="form-label">Username:</label>
@@ -81,11 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // 5-second reload
-        setInterval(() => {
-            location.reload();
-        }, 5000);
-
         // Temporary message fade-out
         document.addEventListener('DOMContentLoaded', () => {
             const alerts = document.querySelectorAll('.alert');

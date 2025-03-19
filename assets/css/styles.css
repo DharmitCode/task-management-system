@@ -202,3 +202,90 @@ body {
 .modal-content {
     border-radius: 16px;
 }
+
+/* iOS-style table and card */
+.card {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.table-striped {
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #fff;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e5ea;
+}
+
+.table-striped th {
+    background-color: #f2f2f7;
+    color: #1c1c1e;
+    font-weight: 600;
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e5ea;
+}
+
+.table-striped td {
+    padding: 12px;
+    color: #1c1c1e;
+    border-bottom: 1px solid #e5e5ea;
+}
+
+.table-striped tr:last-child td {
+    border-bottom: none;
+}
+
+/* iOS-style status dropdown in Actions column */
+.ios-status-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23333' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px 12px;
+    border-radius: 10px;
+    border: 1px solid #d1d1d6;
+    padding: 4px 24px 4px 8px;
+    font-size: 14px;
+    color: #1c1c1e;
+    background-color: #fff;
+    transition: all 0.3s ease;
+    width: 120px; /* Adjust to match screenshot */
+}
+
+.ios-status-select:focus {
+    border-color: #0a84ff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3);
+    background-color: #fff;
+}
+
+.ios-status-select:disabled {
+    background-color: #f2f2f7;
+    color: #8e8e93;
+    border-color: #d1d1d6;
+    cursor: not-allowed;
+}
+
+.ios-status-select option {
+    background-color: #fff;
+    color: #1c1c1e;
+    padding: 8px;
+}
+
+/* Style for overdue tasks */
+.table-danger {
+    background-color: #ffebee; /* Light red background for overdue tasks */
+}
+
+/* Ensure consistency with existing animations */
+.fade-out {
+    animation: fadeOut 0.5s ease-in-out forwards;
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}

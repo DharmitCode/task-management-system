@@ -1,5 +1,4 @@
 <?php
-// includes/db.php
 $host = 'localhost';
 $username = 'root';
 $password = '';

@@ -135,6 +135,7 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.css" />
     <link rel="stylesheet" href="../assets/css/admin_styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -143,11 +144,6 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
         document.getElementById('header-title').textContent = 'Admin Dashboard';
         document.getElementById('nav-link-1').setAttribute('href', 'dashboard.php');
         document.getElementById('nav-link-1').textContent = 'Dashboard';
-
-        // 5-second reload
-        setInterval(() => {
-            location.reload();
-        }, 5000);
 
         // Temporary message fade-out
         document.addEventListener('DOMContentLoaded', () => {
@@ -159,35 +155,127 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                 }, 5000); // Show for 5 seconds
             });
         });
+
+        // Password reveal toggle (for task assignment form)
+        document.querySelectorAll('.password-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const passwordField = this.previousElementSibling;
+                const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordField.setAttribute('type', type);
+                this.classList.toggle('fa-eye-slash');
+            });
+        });
+
+        // AJAX to reload task summary and chart
+        let completionChart;
+        function updateTaskSummaryAndChart() {
+            fetch('fetch_task_summary.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'user_id=<?php echo $_SESSION['user_id']; ?>'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update task summary
+                document.getElementById('total-tasks').textContent = data.total_tasks;
+                document.getElementById('pending-tasks').textContent = data.pending_tasks;
+                document.getElementById('in-progress-tasks').textContent = data.in_progress_tasks;
+                document.getElementById('completed-tasks').textContent = data.completed_tasks;
+
+                // Update chart
+                completionChart.data.datasets[0].data = [data.pending_tasks, data.in_progress_tasks, data.completed_tasks];
+                completionChart.update();
+            })
+            .catch(error => console.error('Error updating task summary and chart:', error));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize chart
+            const ctx = document.getElementById('completionChart').getContext('2d');
+            completionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'In Progress', 'Completed'],
+                    datasets: [{
+                        data: [<?php echo $pending_tasks; ?>, <?php echo $in_progress_tasks; ?>, <?php echo $completed_tasks; ?>],
+                        backgroundColor: [
+                            'rgba(255, 59, 48, 0.8)',
+                            'rgba(255, 204, 0, 0.8)',
+                            'rgba(52, 199, 89, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 59, 48, 1)',
+                            'rgba(255, 204, 0, 1)',
+                            'rgba(52, 199, 89, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true,
+                        duration: 800
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#1c1c1e',
+                                font: {
+                                    size: 14,
+                                    family: '-apple-system, BlinkMacSystemFont, "San Francisco", "Helvetica Neue", sans-serif'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#ffffff',
+                            titleColor: '#1c1c1e',
+                            bodyColor: '#1c1c1e',
+                            borderColor: '#e5e5ea',
+                            borderWidth: 1,
+                            borderRadius: 8
+                        }
+                    }
+                }
+            });
+
+            // Start periodic updates
+            setInterval(updateTaskSummaryAndChart, 5000);
+        });
     </script>
     <div class="content">
-        <h2 class="card-title animate__animated animate__slideInDown">Dashboard Overview</h2>
+        <h2 class="card-title animate__animated animate__fadeInDown">Dashboard Overview</h2>
 
         <!-- Task Statistics -->
         <div class="row g-4">
-            <div class="col-md-6 animate__animated animate__slideInUp" style="animation-delay: 0.1s">
+            <div class="col-md-6 animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
                 <div class="card">
                     <div class="card-body text-center">
                         <h5 class="card-title">Task Summary</h5>
-                        <h1 class="display-4"><?php echo $total_tasks; ?></h1>
+                        <h1 class="display-4" id="total-tasks"><?php echo $total_tasks; ?></h1>
                         <div class="d-flex justify-content-around mt-3">
                             <div>
-                                <a href="?status_filter=pending" class="badge bg-danger clickable rounded-pill"><?php echo $pending_tasks; ?></a> Pending
+                                <a href="?status_filter=pending" class="badge bg-danger clickable" id="pending-tasks"><?php echo $pending_tasks; ?></a> Pending
                             </div>
                             <div>
-                                <a href="?status_filter=in_progress" class="badge bg-warning clickable rounded-pill"><?php echo $in_progress_tasks; ?></a> In Progress
+                                <a href="?status_filter=in_progress" class="badge bg-warning clickable" id="in-progress-tasks"><?php echo $in_progress_tasks; ?></a> In Progress
                             </div>
                             <div>
-                                <a href="?status_filter=completed" class="badge bg-success clickable rounded-pill"><?php echo $completed_tasks; ?></a> Completed
+                                <a href="?status_filter=completed" class="badge bg-success clickable" id="completed-tasks"><?php echo $completed_tasks; ?></a> Completed
                             </div>
                             <div>
-                                <a href="?status_filter=" class="badge bg-secondary clickable rounded-pill"><?php echo $total_tasks; ?></a> All
+                                <a href="?status_filter=" class="badge bg-secondary clickable" id="all-tasks"><?php echo $total_tasks; ?></a> All
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 animate__animated animate__slideInUp" style="animation-delay: 0.2s">
+            <div class="col-md-6 animate__animated animate__fadeInUp" style="animation-delay: 0.2s">
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Completion Rate</h5>
@@ -200,46 +288,50 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
         </div>
 
         <!-- Task Assignment Form -->
-        <div class="card mt-4 animate__animated animate__slideInUp" style="animation-delay: 0.3s">
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.3s">
             <div class="card-body">
                 <h3 class="card-title">Assign New Task</h3>
-                <?php if (isset($success)) echo "<div class='alert alert-success animate__animated animate__fadeIn'>$success</div>"; ?>
-                <?php if (isset($error)) echo "<div class='alert alert-danger animate__animated animate__fadeIn'>$error</div>"; ?>
+                <?php if (isset($success)): ?>
+                    <div class="alert alert-success animate__animated animate__fadeIn"><?php echo $success; ?></div>
+                <?php endif; ?>
+                <?php if (isset($error)): ?>
+                    <div class="alert alert-danger animate__animated animate__fadeIn"><?php echo $error; ?></div>
+                <?php endif; ?>
                 <form method="POST" action="">
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Title:</label>
-                        <input type="text" name="title" class="form-control rounded-pill" required>
+                        <input type="text" name="title" class="form-control" required>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Description:</label>
-                        <textarea name="description" class="form-control rounded-pill" rows="4"></textarea>
+                        <textarea name="description" class="form-control" rows="4"></textarea>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Deadline:</label>
-                        <input type="datetime-local" name="deadline" class="form-control rounded-pill" required>
+                        <input type="datetime-local" name="deadline" class="form-control" required>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label">Assign to:</label>
-                        <select name="assigned_to" class="form-select rounded-pill" required>
+                        <select name="assigned_to" class="form-select" required>
                             <option value="">Select a team member</option>
                             <?php while ($member = $team_members->fetch_assoc()): ?>
                                 <option value="<?php echo $member['id']; ?>"><?php echo $member['username']; ?></option>
                             <?php endwhile; ?>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary rounded-pill w-100 animate__animated animate__bounceIn" style="transition: transform 0.3s;">Assign Task</button>
+                    <button type="submit" class="btn btn-primary w-100">Assign Task</button>
                 </form>
             </div>
         </div>
 
         <!-- Task List -->
-        <div class="card mt-4 animate__animated animate__slideInUp" style="animation-delay: 0.4s">
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.4s">
             <div class="card-body">
                 <h3 class="card-title">Task Management</h3>
                 <div id="taskList">
                     <?php
                     if ($tasks->num_rows > 0) {
-                        echo "<table class='table table-striped rounded-pill overflow-hidden'>";
+                        echo "<table class='table table-striped'>";
                         echo "<thead><tr><th>ID</th><th>Title</th><th>Deadline</th><th>Assigned To</th><th>Status</th><th>Actions</th></tr></thead>";
                         echo "<tbody>";
                         while ($task = $tasks->fetch_assoc()) {
@@ -250,17 +342,17 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                             echo "<td>" . $task['username'] . "</td>";
                             echo "<td>" . $task['status'] . "</td>";
                             echo "<td>";
-                            echo "<button class='btn btn-warning btn-sm me-2 rounded-pill animate__animated animate__bounceIn edit-btn' data-bs-toggle='modal' data-bs-target='#editModal' data-id='" . $task['id'] . "' data-title='" . htmlspecialchars($task['title']) . "' data-deadline='" . $task['deadline'] . "' data-assigned-to='" . $task['username'] . "'>Edit</button>";
+                            echo "<button class='btn btn-warning btn-sm me-2 edit-btn' data-bs-toggle='modal' data-bs-target='#editModal' data-id='" . $task['id'] . "' data-title='" . htmlspecialchars($task['title']) . "' data-deadline='" . $task['deadline'] . "' data-assigned-to='" . $task['username'] . "'>Edit</button>";
                             echo "<form method='POST' style='display:inline;' onsubmit='return confirm(\"Are you sure you want to delete this task?\");'>";
                             echo "<input type='hidden' name='delete_task_id' value='" . $task['id'] . "'>";
-                            echo "<button type='submit' class='btn btn-danger btn-sm rounded-pill animate__animated animate__bounceIn'>Delete</button>";
+                            echo "<button type='submit' class='btn btn-danger btn-sm'>Delete</button>";
                             echo "</form>";
                             echo "</td>";
                             echo "</tr>";
                         }
                         echo "</tbody></table>";
                     } else {
-                        echo "<p>No tasks found. Debug: created_by = " . $_SESSION['user_id'] . ", query = $tasks_query</p>";
+                        echo "<p>No tasks found.</p>";
                     }
                     ?>
                 </div>
@@ -268,14 +360,14 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
         </div>
 
         <!-- Task Report Section -->
-        <div class="card mt-4 animate__animated animate__slideInUp" style="animation-delay: 0.5s">
+        <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.5s">
             <div class="card-body">
                 <h3 class="card-title">Generate Report</h3>
                 <form method="POST" action="">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Filter by Status:</label>
-                            <select name="status_filter" class="form-select rounded-pill">
+                            <select name="status_filter" class="form-select">
                                 <option value="">All</option>
                                 <option value="pending" <?php echo $status_filter == 'pending' ? 'selected' : ''; ?>>Pending</option>
                                 <option value="in_progress" <?php echo $status_filter == 'in_progress' ? 'selected' : ''; ?>>In Progress</option>
@@ -284,7 +376,7 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Filter by Team Member:</label>
-                            <select name="assigned_to_filter" class="form-select rounded-pill">
+                            <select name="assigned_to_filter" class="form-select">
                                 <option value="">All</option>
                                 <?php
                                 $team_members->data_seek(0);
@@ -294,7 +386,7 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                             </select>
                         </div>
                     </div>
-                    <button type="submit" name="export" value="csv" class="btn btn-success mt-3 rounded-pill animate__animated animate__bounceIn">Export as CSV</button>
+                    <button type="submit" name="export" value="csv" class="btn btn-success mt-3">Export as CSV</button>
                 </form>
             </div>
         </div>
@@ -302,7 +394,7 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
         <!-- Edit Task Modal -->
         <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
             <div class="modal-dialog">
-                <div class="modal-content rounded-xl">
+                <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editModalLabel">Edit Task</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -310,17 +402,17 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                     <div class="modal-body">
                         <form method="POST" action="" novalidate>
                             <input type="hidden" name="edit_task_id" id="edit_task_id">
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <label class="form-label">Title:</label>
-                                <input type="text" name="edit_title" id="edit_title" class="form-control rounded-pill">
+                                <input type="text" name="edit_title" id="edit_title" class="form-control">
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <label class="form-label">Deadline:</label>
-                                <input type="datetime-local" name="edit_deadline" id="edit_deadline" class="form-control rounded-pill" required>
+                                <input type="datetime-local" name="edit_deadline" id="edit_deadline" class="form-control" required>
                             </div>
-                            <div class="mb-3">
+                            <div class="mb-4">
                                 <label class="form-label">Assign to:</label>
-                                <select name="edit_assigned_to" id="edit_assigned_to" class="form-select rounded-pill" required>
+                                <select name="edit_assigned_to" id="edit_assigned_to" class="form-select" required>
                                     <?php
                                     $team_members->data_seek(0);
                                     while ($member = $team_members->fetch_assoc()): ?>
@@ -328,7 +420,7 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary rounded-pill w-100 animate__animated animate__bounceIn">Save Changes</button>
+                            <button type="submit" class="btn btn-primary w-100">Save Changes</button>
                         </form>
                     </div>
                 </div>
@@ -346,57 +438,6 @@ error_log("Debug: Dashboard query executed, rows returned: " . $tasks->num_rows 
                 document.getElementById('edit_deadline').value = formattedDeadline;
                 document.getElementById('edit_assigned_to').value = Array.from(document.getElementById('edit_assigned_to').options).find(option => option.text === this.getAttribute('data-assigned-to'))?.value || '';
             });
-        });
-
-        const ctx = document.getElementById('completionChart').getContext('2d');
-        const completionChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Pending', 'In Progress', 'Completed'],
-                datasets: [{
-                    data: [<?php echo $pending_tasks; ?>, <?php echo $in_progress_tasks; ?>, <?php echo $completed_tasks; ?>],
-                    backgroundColor: [
-                        'rgba(255, 59, 48, 0.8)',
-                        'rgba(255, 204, 0, 0.8)',
-                        'rgba(52, 199, 89, 0.8)'
-                    ],
-                    borderColor: [
-                        'rgba(255, 59, 48, 1)',
-                        'rgba(255, 204, 0, 1)',
-                        'rgba(52, 199, 89, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: {
-                    animateScale: true,
-                    animateRotate: true,
-                    duration: 800
-                },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: '#1c1c1e',
-                            font: {
-                                size: 14,
-                                family: '-apple-system, BlinkMacSystemFont, "San Francisco", "Helvetica Neue", sans-serif'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: '#ffffff',
-                        titleColor: '#1c1c1e',
-                        bodyColor: '#1c1c1e',
-                        borderColor: '#e5e5ea',
-                        borderWidth: 1,
-                        borderRadius: 8
-                    }
-                }
-            }
         });
     </script>
     <style>
