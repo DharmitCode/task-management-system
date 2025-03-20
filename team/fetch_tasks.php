@@ -1,6 +1,6 @@
 <?php
 session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'team') {
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['team', 'admin'])) {
     header("Location: ../login.php");
     exit();
 }
@@ -21,8 +21,12 @@ if ($tasks->num_rows > 0) {
     $output .= '<tbody>';
     while ($task = $tasks->fetch_assoc()) {
         $is_overdue = (strtotime($task['deadline']) < strtotime($current_date));
-        $row_class = $is_overdue ? 'table-danger' : '';
-        $disabled = $is_overdue ? 'disabled' : '';
+        $is_completed = ($task['status'] === 'completed');
+        // Team member can edit if: not overdue AND not completed
+        // Admin can edit regardless of overdue or completion
+        $is_editable = ($_SESSION['role'] === 'admin') ? true : (!$is_overdue && !$is_completed);
+        $row_class = $is_overdue ? 'table-danger' : ($is_completed ? 'table-secondary' : '');
+        $disabled = $is_editable ? '' : 'disabled';
         $output .= '<tr class="' . $row_class . '">';
         $output .= '<td>' . $task['id'] . '</td>';
         $output .= '<td>' . htmlspecialchars($task['title']) . '</td>';
@@ -40,6 +44,8 @@ if ($tasks->num_rows > 0) {
         $output .= '</form>';
         if ($is_overdue) {
             $output .= '<span class="text-danger ms-2">Overdue</span>';
+        } elseif ($is_completed) {
+            $output .= '<span class="text-muted ms-2">Completed</span>';
         }
         $output .= '</td>';
         $output .= '</tr>';

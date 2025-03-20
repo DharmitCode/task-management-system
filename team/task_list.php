@@ -1,6 +1,6 @@
 ﻿<?php
 session_start();
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'team') {
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['team', 'admin'])) {
     header("Location: ../login.php");
     exit();
 }
@@ -19,6 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
         $error = "Error updating task status: " . $stmt->error;
     }
 }
+
+// Fetch the logged-in user's details
+$user_query = "SELECT username FROM users WHERE id = " . $_SESSION['user_id'];
+$user_result = $conn->query($user_query);
+$user = $user_result->fetch_assoc();
+$username = $user['username'];
+$role_display = $_SESSION['role'] === 'team' ? 'Team Member' : 'Admin';
 
 // Fetch tasks assigned to the current team member
 $current_date = date('Y-m-d H:i:s');
@@ -103,7 +110,14 @@ $notifications = $conn->query($notifications_query);
         });
     </script>
     <div class="content">
-        <h2 class="card-title animate__animated animate__fadeInDown">My Tasks</h2>
+        <!-- Display logged-in user and role -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="card-title animate__animated animate__fadeInDown">My Tasks</h2>
+            <div class="user-info">
+                <span class="badge bg-primary">Logged in as: <?php echo htmlspecialchars($username); ?></span>
+                <span class="badge bg-secondary ms-2">Role: <?php echo htmlspecialchars($role_display); ?></span>
+            </div>
+        </div>
 
         <!-- Notifications Section -->
         <div class="card mt-4 animate__animated animate__fadeInUp" style="animation-delay: 0.1s">
@@ -143,8 +157,12 @@ $notifications = $conn->query($notifications_query);
                                 <?php while ($task = $tasks->fetch_assoc()): ?>
                                     <?php
                                     $is_overdue = (strtotime($task['deadline']) < strtotime($current_date));
-                                    $row_class = $is_overdue ? 'table-danger' : '';
-                                    $disabled = $is_overdue ? 'disabled' : '';
+                                    $is_completed = ($task['status'] === 'completed');
+                                    // Team member can edit if: not overdue AND not completed
+                                    // Admin can edit regardless of overdue, but not if completed (unless explicitly allowed)
+                                    $is_editable = ($_SESSION['role'] === 'admin') ? true : (!$is_overdue && !$is_completed);
+                                    $row_class = $is_overdue ? 'table-danger' : ($is_completed ? 'table-secondary' : '');
+                                    $disabled = $is_editable ? '' : 'disabled';
                                     ?>
                                     <tr class="<?php echo $row_class; ?>">
                                         <td><?php echo $task['id']; ?></td>
@@ -163,6 +181,8 @@ $notifications = $conn->query($notifications_query);
                                             </form>
                                             <?php if ($is_overdue): ?>
                                                 <span class="text-danger ms-2">Overdue</span>
+                                            <?php elseif ($is_completed): ?>
+                                                <span class="text-muted ms-2">Completed</span>
                                             <?php endif; ?>
                                         </td>
                                     </tr>

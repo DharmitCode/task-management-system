@@ -75,6 +75,11 @@
     background-color: #ffebee; /* Light red background for overdue tasks */
 }
 
+/* Style for completed tasks */
+.table-secondary {
+    background-color: #e9ecef; /* Light gray background for completed tasks */
+}
+
 /* Ensure consistency with existing animations */
 .fade-out {
     animation: fadeOut 0.5s ease-in-out forwards;
